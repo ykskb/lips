@@ -17,7 +17,7 @@
 (defun misp-repl ()
   (write-string "> " *stream-out*)
   (finish-output)
-  (let ((line (read-line *stream-in* nil :eof)))
+  (let ((line (clean-line(read-line *stream-in* nil :eof))))
     (unless (equal line "(misp:exit)")
       (misp-print (misp-eval (misp-read line)))
       (misp-repl))))
@@ -28,8 +28,32 @@
   (when (< pos (length line))
     (let ((ch (char line pos)))
       (cond ((equal ch #\Space) (misp-read line (1+ pos)))
+            ((equal ch #\() (read-list (subseq line (1+ pos))))
             ((digit-char-p ch) (read-number (subseq line pos)))
             (t (read-symbol (subseq line pos)))))))
+
+(defun clean-line (line)
+  (list-to-string 
+    (remove-extra-spaces 
+      (string-trim '(#\Space #\Tab #\Newline) line) 0 nil)))
+
+(defun remove-extra-spaces (line pos spaced)
+  (if (< pos (length line))
+    (let ((ch (char line pos)))
+      (if (equal ch #\Space)
+        (if spaced
+          (remove-extra-spaces line (1+ pos) t)
+          (cons ch (remove-extra-spaces line (1+ pos) t)))
+        (cons ch (remove-extra-spaces line (1+ pos) nil))))
+    nil))
+
+(defun read-list (line &optional (pos 0))
+  (when (and (< pos (length line)) 
+        (not (equal #\) (char line pos))))
+    (let ((token (misp-read (subseq line pos))))
+      (if token
+        (cons token (read-list line (1+ (+ pos (num-str-length token)))))
+        nil))))
 
 (defun read-number (line)
   (parse-integer (list-to-string (read-number-chars line))))
@@ -54,7 +78,8 @@
 ;;; Evaluator
 
 (defun misp-eval (token)
-  (cond ((numberp token) token)
+  (cond ((listp token) token)
+        ((numberp token) token)
         ((stringp token) token)))
 
 ;;; Output
@@ -62,11 +87,13 @@
 (defun misp-print (res)
   (write-line (cond ((integerp res) (format nil "~D" res))
         ((stringp res) res)
-        ((listp res) (format nil "(~{~A~})" res))) *stream-out*))
+        ((listp res) (format nil "(~{~A ~})" res))) *stream-out*))
 
 ;;; Generic
 
 (defun list-to-string (lst)
     (format nil "~{~A~}" lst))
 
-
+(defun num-str-length (val)
+  (cond ((numberp val) (length (write-to-string val)))
+        ((stringp val) (length val))))
