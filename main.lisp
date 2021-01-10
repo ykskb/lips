@@ -85,9 +85,11 @@
 ;;; Output
 
 (defun misp-print (res)
-  (write-line (cond ((integerp res) (format nil "~D" res))
-        ((stringp res) res)
-        ((listp res) (format nil "(~{~A ~})" res))) *stream-out*))
+  (write-line 
+    (cond ((integerp res) (format nil "~D" res))
+          ((stringp res) res)
+          ((listp res) (format nil "(~{~A ~})" res)))
+     *stream-out*))
 
 ;;; Generic
 
