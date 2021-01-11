@@ -15,6 +15,16 @@
     (setf *stream-out* stream-out))
   (misp-repl))
 
+(defun misp-repl ()
+  (write-string "> " *stream-out*)
+  (finish-output)
+  (let ((line (clean-line(read-line *stream-in* nil :eof))))
+    (unless (equal line "(misp:exit)")
+      (misp-print (misp-eval (misp-read (make-instance 'input-line :str line))))
+      (misp-repl))))
+
+;;; Parser
+
 (defclass input-line (); Tried functional approach, but mutual recursion for reading list ended up ugly...
   ((str
     :initarg :str
@@ -38,16 +48,6 @@
     (forward-head obj)
     ch))
   
-(defun misp-repl ()
-  (write-string "> " *stream-out*)
-  (finish-output)
-  (let ((line (clean-line(read-line *stream-in* nil :eof))))
-    (unless (equal line "(misp:exit)")
-      (misp-print (misp-eval (misp-read (make-instance 'input-line :str line))))
-      (misp-repl))))
-
-;;; Parser
-
 (defun misp-read (line)
   (when (has-more-str line)
     (let ((ch (peek-ch line)))
@@ -111,7 +111,7 @@
   (write-line 
     (cond ((integerp res) (format nil "~D" res))
           ((stringp res) res)
-          ((listp res) (format nil "(~{~A ~})" res)))
+          ((listp res) (format nil "(~{~A~^ ~})" res)))
      *stream-out*))
 
 ;;; Generic
