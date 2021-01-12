@@ -100,10 +100,37 @@
 
 ;;; Evaluator
 
-(defun misp-eval (token)
-  (cond ((listp token) token)
-        ((numberp token) token)
-        ((stringp token) token)))
+ (defclass env ()
+  ((parent
+    :initarg :parent
+    :initform nil
+    :accessor parent)
+   (bindings
+    :initform (make-hash-table :test 'equal)
+    :accessor bindings))
+  (:documentation "Binding hash map with a pointe to the parent envionment."))
+
+(defmethod search-bind ((obj env) key)
+  (if (nth-value 1 (gethash key (bindings obj)))
+    (gethash key (bindings obj))
+    (if (parent obj)
+      (search-bind (parent obj) (key))
+      (format *stream-out* "~S is undefined." key))))
+
+(defparameter *global-env* (make-instance 'env))
+
+(defun misp-eval (form &optional (env *global-env*))
+  (cond ((listp form) 
+          (let ((f-name (car form)))
+            (cond ((equal "if" f-name)
+                   (if (misp-eval (cadr form))
+                     (misp-eval (caddr form))
+                     (misp-eval (cadddr form))))
+                  ((equal "def" f-name)
+                   (setf (gethash (cadr form) (bindings env)) (caddr form))
+                   (caddr form))) ))
+        ((numberp form) form)
+        ((stringp form) (search-bind env form))))
 
 ;;; Output
 
@@ -122,3 +149,12 @@
 (defun num-str-length (val)
   (cond ((numberp val) (length (write-to-string val)))
         ((stringp val) (length val))))
+
+;;; Util
+
+(defmethod print-object ((object hash-table) stream)
+  (format stream "#HASH{~{~{(~a : ~a)~}~^ ~}}"
+          (loop for key being the hash-keys of object
+                using (hash-value value)
+                collect (list key value))))
+
