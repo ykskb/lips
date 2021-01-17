@@ -5,14 +5,9 @@
   (:export :misp))
 (in-package :misp)
 
-(defparameter *stream-in* *standard-input*)
-(defparameter *stream-out* *standard-output*)
-
 (defun misp (&optional (stream-in nil) (stream-out nil))
-  (when stream-in
-    (setf *stream-in* stream-in))
-  (when stream-out
-    (setf *stream-out* stream-out))
+    (setf *stream-in* (if stream-in stream-in *standard-input*))
+    (setf *stream-out* (if stream-out stream-out *standard-output*))
   (misp-repl))
 
 (defun misp-repl ()
@@ -25,14 +20,14 @@
 
 ;;; Parser
 
-(defclass input-line (); Tried functional approach, but mutual recursion for reading list ended up ugly...
+(defclass input-line ()
   ((str
     :initarg :str
     :accessor str)
    (head
     :initform 0
     :accessor head))
-  (:documentation "Input line class with the character head."))
+  (:documentation "Class for an input line with the character head."))
 
 (defmethod has-more-str ((obj input-line))
   (< (head obj) (length (str obj))))
@@ -72,13 +67,13 @@
     nil))
 
 (defun read-list (line)
-  (if (and (has-more-str line) 
-           (not (equal #\) (peek-ch line))))
+  (if (equal #\) (peek-ch line))
+    (progn (forward-head line)
+           nil)
     (let ((token (misp-read line)))
       (if token
         (cons token (read-list line))
-        nil))
-    nil))
+        nil))))
 
 (defun read-number (line)
   (parse-integer (list-to-string (read-number-chars line))))
@@ -108,36 +103,64 @@
    (bindings
     :initform (make-hash-table :test 'equal)
     :accessor bindings))
-  (:documentation "Binding hash map with a pointe to the parent envionment."))
+  (:documentation "Hash table for variable bindings with a pointer to the parent envionment."))
 
 (defmethod search-bind ((obj env) key)
-  (if (nth-value 1 (gethash key (bindings obj)))
+  (if (nth-value 1 (gethash key (bindings obj))) ; check the flag for key existance
     (gethash key (bindings obj))
     (if (parent obj)
-      (search-bind (parent obj) (key))
-      (format *stream-out* "~S is undefined." key))))
+      (search-bind (parent obj) key))))
+
+(defstruct func
+           args
+           codes)
 
 (defparameter *global-env* (make-instance 'env))
 
+;; Built-in functions
+(setf (gethash "+" (bindings *global-env*)) (lambda (args) (+ (car args) (cadr args))))
+(setf (gethash "-" (bindings *global-env*)) (lambda (args) (- (car args) (cadr args))))
+(setf (gethash "*" (bindings *global-env*)) (lambda (args) (* (car args) (cadr args))))
+(setf (gethash "/" (bindings *global-env*)) (lambda (args) (/ (car args) (cadr args))))
+(setf (gethash "=" (bindings *global-env*)) (lambda (args) (= (car args) (cadr args))))
+
 (defun misp-eval (form &optional (env *global-env*))
-  (cond ((listp form) 
-          (let ((f-name (car form)))
-            (cond ((equal "if" f-name)
-                   (if (misp-eval (cadr form))
-                     (misp-eval (caddr form))
-                     (misp-eval (cadddr form))))
-                  ((equal "def" f-name)
-                   (setf (gethash (cadr form) (bindings env)) (caddr form))
-                   (caddr form))) ))
-        ((numberp form) form)
-        ((stringp form) (search-bind env form))))
+  (typecase form
+    (list
+      (let ((f-name (car form)))
+        (cond ((equal "if" f-name)
+          (if (misp-eval (cadr form) env)
+            (misp-eval (caddr form) env)
+            (misp-eval (cadddr form) env)))
+        ((equal "define" f-name)
+          (let ((val (misp-eval (caddr form) env)))
+            (setf (gethash (cadr form) (bindings env)) val)
+            val))
+        ((equal "lambda" f-name)
+          (make-func :args (cadr form) :codes (caddr form)))
+        (t (let ((bind (search-bind env f-name)))
+          (cond ((functionp bind)
+                 (funcall bind (mapcar (lambda (param) (misp-eval param env)) (cdr form))))
+                ((typep bind 'func)
+                 (let ((new-env (make-instance 'env :parent env)))
+                   (mapcar (lambda (k v)
+                             (setf (gethash k (bindings new-env)) (misp-eval v env)))
+                           (func-args bind)
+                           (cdr form))
+                   (misp-eval (func-codes bind) new-env)))
+                (t form)))))))
+    (number form)
+    (string (search-bind env form))
+    (boolean form)))
 
 ;;; Output
 
 (defun misp-print (res)
   (write-line 
-    (cond ((integerp res) (format nil "~D" res))
+    (cond ((typep res 'func) "lambda") 
+          ((integerp res) (format nil "~D" res))
           ((stringp res) res)
+          ((typep res 'boolean) (if res "T" "NIL")) ; (typep nil list) => t
           ((listp res) (format nil "(~{~A~^ ~})" res)))
      *stream-out*))
 

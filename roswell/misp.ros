@@ -14,5 +14,5 @@ exec ros -Q -- $0 "$@"
 
 (defun main (&rest argv)
   (declare (ignorable argv))
-  (misp:misp *standard-input* *standard-output*))
+  (misp:misp))
 ;;; vim: set ft=lisp lisp:
