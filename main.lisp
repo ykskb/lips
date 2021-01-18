@@ -176,12 +176,3 @@
 (defun num-str-length (val)
   (cond ((numberp val) (length (write-to-string val)))
         ((stringp val) (length val))))
-
-;;; Util
-
-(defmethod print-object ((object hash-table) stream)
-  (format stream "#HASH{~{~{(~a : ~a)~}~^ ~}}"
-          (loop for key being the hash-keys of object
-                using (hash-value value)
-                collect (list key value))))
-
