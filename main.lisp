@@ -1,23 +1,23 @@
 ;;; main.lisp
 (in-package :cl-user)
-(defpackage :misp
+(defpackage :lips
   (:use cl)
-  (:export :misp))
-(in-package :misp)
+  (:export :lips))
+(in-package :lips)
 
-(defun misp (&optional (stream-in nil) (stream-out nil) (one-line-exec nil))
+(defun lips (&optional (stream-in nil) (stream-out nil) (one-line-exec nil))
     (setf *stream-in* (if stream-in stream-in *standard-input*))
     (setf *stream-out* (if stream-out stream-out *standard-output*))
-  (misp-repl one-line-exec))
+  (lips-repl one-line-exec))
 
-(defun misp-repl (&optional (one-line-exec nil))
+(defun lips-repl (&optional (one-line-exec nil))
   (write-string "> " *stream-out*)
   (finish-output)
   (let ((line (clean-line(read-line *stream-in* nil :eof))))
-    (unless (equal line "(misp:exit)")
-      (misp-print (misp-eval (misp-read (make-instance 'input-line :str line))))
+    (unless (equal line "(lips:exit)")
+      (lips-print (lips-eval (lips-read (make-instance 'input-line :str line))))
       (unless one-line-exec
-        (misp-repl)))))
+        (lips-repl)))))
 
 ;;; Parser
 
@@ -44,10 +44,10 @@
     (forward-head obj)
     ch))
   
-(defun misp-read (line)
+(defun lips-read (line)
   (when (has-more-str line)
     (let ((ch (peek-ch line)))
-      (cond ((equal ch #\Space) (forward-head line) (misp-read line))
+      (cond ((equal ch #\Space) (forward-head line) (lips-read line))
             ((equal ch #\() (forward-head line) (read-list line))
             ((digit-char-p ch) (read-number line))
             (t (read-symbol line))))))
@@ -71,7 +71,7 @@
   (if (equal #\) (peek-ch line))
     (progn (forward-head line)
            nil)
-    (let ((token (misp-read line)))
+    (let ((token (lips-read line)))
       (if token
         (cons token (read-list line))
         nil))))
@@ -125,32 +125,32 @@
 (setf (gethash "/" (bindings *global-env*)) (lambda (args) (apply #'/ args)))
 (setf (gethash "=" (bindings *global-env*)) (lambda (args) (apply #'= args)))
 
-(defun misp-eval (form &optional (env *global-env*))
+(defun lips-eval (form &optional (env *global-env*))
   (typecase form
     (list
       (let ((f-name (car form))) ; Special Forms
         (cond ((equal "progn" f-name)
-               (car (last (mapcar (lambda (item) (misp-eval item env)) (cdr form)))))
+               (car (last (mapcar (lambda (item) (lips-eval item env)) (cdr form)))))
               ((equal "if" f-name)
-                (if (misp-eval (cadr form) env)
-                  (misp-eval (caddr form) env)
-                  (misp-eval (cadddr form) env)))
+                (if (lips-eval (cadr form) env)
+                  (lips-eval (caddr form) env)
+                  (lips-eval (cadddr form) env)))
               ((equal "define" f-name)
-               (let ((val (misp-eval (caddr form) env)))
+               (let ((val (lips-eval (caddr form) env)))
                  (setf (gethash (cadr form) (bindings env)) val)
                  val))
               ((equal "lambda" f-name)
                (make-func :args (cadr form) :codes (caddr form)))
                (t (let ((bind (search-bind env f-name)))
                     (cond ((functionp bind)
-                           (funcall bind (mapcar (lambda (param) (misp-eval param env)) (cdr form))))
+                           (funcall bind (mapcar (lambda (param) (lips-eval param env)) (cdr form))))
                           ((typep bind 'func)
                            (let ((new-env (make-instance 'env :parent env)))
                              (mapcar (lambda (k v)
-                                       (setf (gethash k (bindings new-env)) (misp-eval v env)))
+                                       (setf (gethash k (bindings new-env)) (lips-eval v env)))
                                      (func-args bind)
                                      (cdr form))
-                             (misp-eval (func-codes bind) new-env)))
+                             (lips-eval (func-codes bind) new-env)))
                           (t form)))))))
     (number form)
     (string (search-bind env form))
@@ -158,7 +158,7 @@
 
 ;;; Output
 
-(defun misp-print (res)
+(defun lips-print (res)
   (write-line 
     (cond ((typep res 'func) "lambda") 
           ((integerp res) (format nil "~D" res))

@@ -1,16 +1,16 @@
-;;; misp-test.asd
+;;; lips-test.asd
 (in-package :cl-user)
-(defpackage :misp-test-asd
+(defpackage :lips-test-asd
   (:use :cl :asdf :uiop))
-(in-package :misp-test-asd)
+(in-package :lips-test-asd)
 
-(defsystem :misp-test
+(defsystem :lips-test
   :class :package-inferred-system
-  :description "Tests for Misp"
+  :description "Tests for Lips"
   :version "0.1"
   :author "yohei"
   :license "MIT"
-  :depends-on (:misp :fiveam)
+  :depends-on (:lips :fiveam)
   :components ((:module "tests" :components ((:file "main"))))
   :perform (test-op (o s)
-            (uiop:symbol-call :fiveam :run! :misp)))
+            (uiop:symbol-call :fiveam :run! :lips)))

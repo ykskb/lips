@@ -1,14 +1,14 @@
-;;; misp.asd
+;;; lips.asd
 (in-package :cl-user)
-(defpackage :misp-asd
+(defpackage :lips-asd
   (:use :cl :asdf))
-(in-package :misp-asd)
+(in-package :lips-asd)
 
-(defsystem :misp
+(defsystem :lips
   :class :package-inferred-system
   :description "Mini Lisp in Lisp"
   :version "0.1"
   :author "yohei"
   :license "MIT"
-  :depends-on ("misp/main")
-  :in-order-to ((test-op (test-op misp-test))))
+  :depends-on ("lips/main")
+  :in-order-to ((test-op (test-op lips-test))))

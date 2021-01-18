@@ -1,8 +1,8 @@
-# misp
+# lips
 
 `Mini Lisp in (less than 200 lines of) Lisp` 
 
-This is a very minimal Lisp interpreter written in  Lisp for myself to study:
+This is a very minimal Lisp interpreter written in Lisp for myself to study:
 
 * interpreter basics
 * basics of Lisp itself
@@ -10,12 +10,12 @@ This is a very minimal Lisp interpreter written in  Lisp for myself to study:
 * project setup with Roswell
 * writing tests (`fiveam`)
 
-and it is not intended to be a full-fledged Lisp.
+(...and of course it is not intended to be a full-fledged Lisp.)
 
 #### Supported Features
 
 * integers
-* symbols with `define` (not ANSI)
+* symbols with `define` (not ANSI CL)
 * `if`
 * lambda
 * lexically-scoped variables
@@ -39,27 +39,27 @@ Clone the project under `local-projects` directory of Quicklisp or Roswell, and 
 ###### Using Roswell
 
 ```sh
-./roswell/misp.ros
+./roswell/lips.ros
 ```
 
 ###### Using Quicklisp
 
 ```lisp
-(ql:quickload '(:misp) :silent t)
-(misp:misp)
+(ql:quickload '(:lips) :silent t)
+(lips:lips)
 ```
 
 ###### Exit
 ```lisp
-(misp:exit)
+(lips:exit)
 ```
 
 #### Test
 ```lisp
 (ql:quickload :fiveam)
-(load #p"misp.asd")
-(load #p"misp-test.asd")
-(asdf:test-system :misp)
+(load #p"lips.asd")
+(load #p"lips-test.asd")
+(asdf:test-system :lips)
 ```
 
 
