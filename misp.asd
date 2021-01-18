@@ -10,4 +10,5 @@
   :version "0.1"
   :author "yohei"
   :license "MIT"
-  :depends-on ("misp/main"))
+  :depends-on ("misp/main")
+  :in-order-to ((test-op (test-op misp-test))))

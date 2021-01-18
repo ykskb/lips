@@ -6,13 +6,13 @@ This is a very minimal Lisp interpreter written in  Lisp for myself to study:
 
 * interpreter basics
 * basics of Lisp itself
-* coding in Lisp (SBCL)
+* coding in Lisp (`SBCL`)
 * project setup with Roswell
-* writing tests
+* writing tests (`fiveam`)
 
-and it is not intended to be full-fledged Lisp.
+and it is not intended to be a full-fledged Lisp.
 
-##### Supported Features
+#### Supported Features
 
 * integers
 * symbols with `define` (not ANSI)
@@ -21,8 +21,9 @@ and it is not intended to be full-fledged Lisp.
 * lexically-scoped variables
 * `+`, `-`, `/`, `*` and `=`
 * user-defined functions
+* progn
 
-##### Example Codes
+###### Example Codes
 
 Recursive fibonacci function:
 
@@ -31,9 +32,9 @@ Recursive fibonacci function:
 (fibonacci 12) ; output: 89
 ```
 
-##### How to Run
+#### How to Run
 
-Clone the project under `local-projects` directory of Quicklisp or Roswell and run commands as below.
+Clone the project under `local-projects` directory of Quicklisp or Roswell, and run commands as below.
 
 ###### Using Roswell
 
@@ -46,6 +47,19 @@ Clone the project under `local-projects` directory of Quicklisp or Roswell and r
 ```lisp
 (ql:quickload '(:misp) :silent t)
 (misp:misp)
+```
+
+###### Exit
+```lisp
+(misp:exit)
+```
+
+#### Test
+```lisp
+(ql:quickload :fiveam)
+(load #p"misp.asd")
+(load #p"misp-test.asd")
+(asdf:test-system :misp)
 ```
 
 

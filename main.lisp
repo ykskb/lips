@@ -5,18 +5,19 @@
   (:export :misp))
 (in-package :misp)
 
-(defun misp (&optional (stream-in nil) (stream-out nil))
+(defun misp (&optional (stream-in nil) (stream-out nil) (one-line-exec nil))
     (setf *stream-in* (if stream-in stream-in *standard-input*))
     (setf *stream-out* (if stream-out stream-out *standard-output*))
-  (misp-repl))
+  (misp-repl one-line-exec))
 
-(defun misp-repl ()
+(defun misp-repl (&optional (one-line-exec nil))
   (write-string "> " *stream-out*)
   (finish-output)
   (let ((line (clean-line(read-line *stream-in* nil :eof))))
     (unless (equal line "(misp:exit)")
       (misp-print (misp-eval (misp-read (make-instance 'input-line :str line))))
-      (misp-repl))))
+      (unless one-line-exec
+        (misp-repl)))))
 
 ;;; Parser
 
@@ -89,7 +90,7 @@
 
 (defun read-symbol-chars (line)
   (if (has-more-str line)
-    (unless (member (peek-ch line) '(#\space #\( #\)))
+    (unless (member (peek-ch line) '(#\Space #\( #\)))
       (cons (read-ch line) (read-symbol-chars line)))
     nil))
 
@@ -117,38 +118,40 @@
 
 (defparameter *global-env* (make-instance 'env))
 
-;; Built-in functions
-(setf (gethash "+" (bindings *global-env*)) (lambda (args) (+ (car args) (cadr args))))
-(setf (gethash "-" (bindings *global-env*)) (lambda (args) (- (car args) (cadr args))))
-(setf (gethash "*" (bindings *global-env*)) (lambda (args) (* (car args) (cadr args))))
-(setf (gethash "/" (bindings *global-env*)) (lambda (args) (/ (car args) (cadr args))))
-(setf (gethash "=" (bindings *global-env*)) (lambda (args) (= (car args) (cadr args))))
+; Built-in Functions
+(setf (gethash "+" (bindings *global-env*)) (lambda (args) (apply #'+ args)))
+(setf (gethash "-" (bindings *global-env*)) (lambda (args) (apply #'- args)))
+(setf (gethash "*" (bindings *global-env*)) (lambda (args) (apply #'* args)))
+(setf (gethash "/" (bindings *global-env*)) (lambda (args) (apply #'/ args)))
+(setf (gethash "=" (bindings *global-env*)) (lambda (args) (apply #'= args)))
 
 (defun misp-eval (form &optional (env *global-env*))
   (typecase form
     (list
-      (let ((f-name (car form)))
-        (cond ((equal "if" f-name)
-          (if (misp-eval (cadr form) env)
-            (misp-eval (caddr form) env)
-            (misp-eval (cadddr form) env)))
-        ((equal "define" f-name)
-          (let ((val (misp-eval (caddr form) env)))
-            (setf (gethash (cadr form) (bindings env)) val)
-            val))
-        ((equal "lambda" f-name)
-          (make-func :args (cadr form) :codes (caddr form)))
-        (t (let ((bind (search-bind env f-name)))
-          (cond ((functionp bind)
-                 (funcall bind (mapcar (lambda (param) (misp-eval param env)) (cdr form))))
-                ((typep bind 'func)
-                 (let ((new-env (make-instance 'env :parent env)))
-                   (mapcar (lambda (k v)
-                             (setf (gethash k (bindings new-env)) (misp-eval v env)))
-                           (func-args bind)
-                           (cdr form))
-                   (misp-eval (func-codes bind) new-env)))
-                (t form)))))))
+      (let ((f-name (car form))) ; Special Forms
+        (cond ((equal "progn" f-name)
+               (car (last (mapcar (lambda (item) (misp-eval item env)) (cdr form)))))
+              ((equal "if" f-name)
+                (if (misp-eval (cadr form) env)
+                  (misp-eval (caddr form) env)
+                  (misp-eval (cadddr form) env)))
+              ((equal "define" f-name)
+               (let ((val (misp-eval (caddr form) env)))
+                 (setf (gethash (cadr form) (bindings env)) val)
+                 val))
+              ((equal "lambda" f-name)
+               (make-func :args (cadr form) :codes (caddr form)))
+               (t (let ((bind (search-bind env f-name)))
+                    (cond ((functionp bind)
+                           (funcall bind (mapcar (lambda (param) (misp-eval param env)) (cdr form))))
+                          ((typep bind 'func)
+                           (let ((new-env (make-instance 'env :parent env)))
+                             (mapcar (lambda (k v)
+                                       (setf (gethash k (bindings new-env)) (misp-eval v env)))
+                                     (func-args bind)
+                                     (cdr form))
+                             (misp-eval (func-codes bind) new-env)))
+                          (t form)))))))
     (number form)
     (string (search-bind env form))
     (boolean form)))
@@ -159,6 +162,7 @@
   (write-line 
     (cond ((typep res 'func) "lambda") 
           ((integerp res) (format nil "~D" res))
+          ((typep res 'ratio) (format nil "~F" res))
           ((stringp res) res)
           ((typep res 'boolean) (if res "T" "NIL")) ; (typep nil list) => t
           ((listp res) (format nil "(~{~A~^ ~})" res)))
