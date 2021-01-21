@@ -15,6 +15,12 @@
 (test lips-primitive
   (is (string= "1" (run-lips "1"))))
 
+(test lips-illegal-func-calls
+  (is (string= "Illegal function call." (run-lips "(1)")))
+  (is (string= "Illegal function call." (run-lips "(a)")))
+  (is (string= "Illegal function call." (run-lips "(3 a)")))
+  (is (string= "Illegal function call." (run-lips "(progn (define fn (lambda (n) (n))) (fn 3))"))))
+
 (test lips-built-in-funcs
   (is (string= "6" (run-lips "(+ 1 2 3)")))
   (is (string= "1" (run-lips "(- 5 3 1)")))
@@ -23,6 +29,11 @@
   (is (string= "1.5" (run-lips "(/ 3 2)")))
   (is (string= "NIL" (run-lips "(= 1 1 3)")))
   (is (string= "T" (run-lips "(= 1 1 1)"))))
+
+(test lips-quote
+  (is (string= "a" (run-lips "'a")))
+  (is (string= "1" (run-lips "'1")))
+  (is (string= "(1 2)" (run-lips "'(1 2)"))))
 
 (test lips-progn
   (is (string= "2" (run-lips "(progn 1 2)")))

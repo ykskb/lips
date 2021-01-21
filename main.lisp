@@ -5,6 +5,10 @@
   (:export :lips))
 (in-package :lips)
 
+(defparameter *lips-error* nil)
+(defstruct quote-obj expr)
+(defstruct lambda-obj args codes)
+
 (defun lips (&optional (stream-in nil) (stream-out nil) (one-line-exec nil))
     (setf *stream-in* (if stream-in stream-in *standard-input*))
     (setf *stream-out* (if stream-out stream-out *standard-output*))
@@ -49,6 +53,7 @@
     (let ((ch (peek-ch line)))
       (cond ((equal ch #\Space) (forward-head line) (lips-read line))
             ((equal ch #\() (forward-head line) (read-list line))
+            ((equal ch #\') (forward-head line) (make-quote-obj :expr (lips-read line)))
             ((digit-char-p ch) (read-number line))
             (t (read-symbol line))))))
 
@@ -112,10 +117,6 @@
     (if (parent obj)
       (search-bind (parent obj) key))))
 
-(defstruct func
-           args
-           codes)
-
 (defparameter *global-env* (make-instance 'env))
 
 ; Built-in Functions
@@ -126,47 +127,58 @@
 (setf (gethash "=" (bindings *global-env*)) (lambda (args) (apply #'= args)))
 
 (defun lips-eval (form &optional (env *global-env*))
-  (typecase form
-    (list
-      (let ((f-name (car form))) ; Special Forms
-        (cond ((equal "progn" f-name)
-               (car (last (mapcar (lambda (item) (lips-eval item env)) (cdr form)))))
-              ((equal "if" f-name)
-                (if (lips-eval (cadr form) env)
-                  (lips-eval (caddr form) env)
-                  (lips-eval (cadddr form) env)))
-              ((equal "define" f-name)
-               (let ((val (lips-eval (caddr form) env)))
-                 (setf (gethash (cadr form) (bindings env)) val)
-                 val))
-              ((equal "lambda" f-name)
-               (make-func :args (cadr form) :codes (caddr form)))
-               (t (let ((bind (search-bind env f-name)))
-                    (cond ((functionp bind)
-                           (funcall bind (mapcar (lambda (param) (lips-eval param env)) (cdr form))))
-                          ((typep bind 'func)
-                           (let ((new-env (make-instance 'env :parent env)))
-                             (mapcar (lambda (k v)
-                                       (setf (gethash k (bindings new-env)) (lips-eval v env)))
-                                     (func-args bind)
-                                     (cdr form))
-                             (lips-eval (func-codes bind) new-env)))
-                          (t form)))))))
-    (number form)
-    (string (search-bind env form))
-    (boolean form)))
+  (unless *lips-error*
+    (typecase form
+      (list
+        (let ((f-name (car form))) ; Special Forms
+          (cond ((equal "progn" f-name)
+                 (car (last (mapcar (lambda (item) (lips-eval item env)) (cdr form)))))
+                ((equal "if" f-name)
+                  (if (lips-eval (cadr form) env)
+                    (lips-eval (caddr form) env)
+                    (lips-eval (cadddr form) env)))
+                ((equal "define" f-name)
+                 (let ((val (lips-eval (caddr form) env)))
+                   (unless *lips-error*
+                     (setf (gethash (cadr form) (bindings env)) val)
+                     val)))
+                ((equal "lambda" f-name)
+                 (make-lambda-obj :args (cadr form) :codes (caddr form)))
+                (t (let ((bind (search-bind env f-name)))
+                     (typecase bind
+                       (function
+                         (funcall bind (mapcar (lambda (param) (lips-eval param env)) (cdr form))))
+                       (quote-obj bind)
+                       (lambda-obj
+                         (let ((new-env (make-instance 'env :parent env)))
+                           (mapcar (lambda (k v)
+                                     (setf (gethash k (bindings new-env)) (lips-eval v env)))
+                                   (lambda-obj-args bind)
+                                   (cdr form))
+                           (lips-eval (lambda-obj-codes bind) new-env)))
+                       (t (setf *lips-error* "Illegal function call."))))))))
+      (quote-obj form)
+      (number form)
+      (string (search-bind env form))
+      (boolean form))))
 
 ;;; Output
 
 (defun lips-print (res)
-  (write-line 
-    (cond ((typep res 'func) "lambda") 
-          ((integerp res) (format nil "~D" res))
-          ((typep res 'ratio) (format nil "~F" res))
-          ((stringp res) res)
-          ((typep res 'boolean) (if res "T" "NIL")) ; (typep nil list) => t
-          ((listp res) (format nil "(~{~A~^ ~})" res)))
-     *stream-out*))
+  (if *lips-error*
+    (progn (write-line *lips-error* *stream-out*)
+           (setf *lips-error* nil))
+    (if (typep res 'quote-obj)
+      (lips-print (quote-obj-expr res))
+      (write-line 
+        (typecase res
+          (lambda-obj "lambda") 
+          (integer (format nil "~D" res))
+          (ratio (format nil "~F" res))
+          (string res)
+          (boolean (if res "T" "NIL")) ; (typep nil list) => t
+          (list (format nil "(~{~A~^ ~})" res)))
+         *stream-out*))))
 
 ;;; Generic
 
