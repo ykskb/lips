@@ -1,35 +1,51 @@
 # lips
 
-`Mini Lisp in (less than 200 lines of) Lisp` 
+`Mini Lisp in (less than 300 lines of) Lisp` 
 
-This is a very minimal Lisp interpreter written in Lisp for myself to study:
-
-* interpreter basics
-* basics of Lisp itself
-* coding in Lisp (`SBCL`)
-* project setup with Roswell
-* writing tests (`fiveam`)
-
-(...and of course it is not intended to be a full-fledged Lisp.)
+This is a very minimal Lisp interpreter written in Lisp. I made it since I wanted to learn Lisp as well as how to set up a Lisp project with Roswell and a testing library. It's nowhere near a full-fledged Lisp, nor does it intend to be, yet I found it quite fun to code Lisp to make Lisp :)
 
 #### Supported Features
 
+* `nil`
 * integers
 * symbols with `define` (not ANSI CL)
 * `if`
 * lambda
-* lexically-scoped variables
 * `+`, `-`, `/`, `*` and `=`
 * user-defined functions
+* lexically-scoped variables
 * progn
+* quote (data)
+* back quote interpolation
+* macro
+* macroexpand
 
-###### Example Codes
+###### Examples of Supported Codes
 
-Recursive fibonacci function:
+* Recursive fibonacci function
 
 ```lisp
 (define fibonacci (lambda (n) (if (= n 0) nil (if (= n 1) 0 (if (= n 2) 1 (+ (fibonacci (- n 1)) (fibonacci (- n 2))))))))
-(fibonacci 12) ; output: 89
+(fibonacci 12)
+; 89
+```
+
+* `unless` macro
+
+```lisp
+(defmacro unless (cond body) `(if ,cond () ,body))
+(macroexpand '(unless (= 3 4) 1))
+; (if (= 3 4) NIL 1)
+(unless (= 3 4) 1)
+; 1
+```
+
+* Back quote interpolation & evaluation
+
+```lisp
+(define n 3)
+`,(+ 2 n)
+; 5
 ```
 
 #### How to Run

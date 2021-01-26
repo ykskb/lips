@@ -256,6 +256,9 @@ function is used without evaluating the comma symbols."
 
 ;;; Output
 
+(defmethod print-object ((obj nil-obj) out)
+    (format out "NIL"))
+
 (defun lips-print (res)
   (if *lips-error*
     (progn (write-line *lips-error* *stream-out*)
