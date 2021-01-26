@@ -1,6 +1,6 @@
 # lips
 
-`Mini Lisp in (less than 300 lines of) Lisp` 
+`Mini Lisp in 300 lines of Lisp` 
 
 This is a very minimal Lisp interpreter written in Lisp. I made it since I wanted to learn Lisp as well as how to set up a Lisp project with Roswell and a testing library. It's nowhere near a full-fledged Lisp, nor does it intend to be, yet I found it quite fun to code Lisp to make Lisp :)
 
