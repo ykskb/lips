@@ -9,12 +9,7 @@
 (defvar *stream-in*)
 (defvar *stream-out*)
 
-(defstruct nil-obj)
-(defstruct quote-obj expr)
-(defstruct back-quote-obj expr)
-(defstruct comma-obj expr)
-(defstruct lambda-obj args codes)
-(defstruct macro-obj params codes)
+;;; Main
 
 (defun lips (&optional (stream-in nil) (stream-out nil) (one-line-exec nil))
     (setf *stream-in* (if stream-in stream-in *standard-input*))
@@ -54,7 +49,14 @@
   (let ((ch (peek-ch obj)))
     (forward-head obj)
     ch))
-  
+ 
+(defstruct nil-obj)
+(defstruct quote-obj expr)
+(defstruct back-quote-obj expr)
+(defstruct comma-obj expr)
+(defstruct lambda-obj args codes)
+(defstruct macro-obj params codes)
+ 
 (defun lips-read (line &optional)
   (when (and (has-more-str line) (not *lips-error*))
     (let ((ch (peek-ch line)))
@@ -69,6 +71,7 @@
             (t (read-symbol line))))))
 
 (defun check-nil (line)
+  "Checks for an empty list."
   (if (equal #\) (peek-ch line))
     (progn (forward-head line)
            t)))
@@ -116,6 +119,7 @@
   (:documentation "Hash table for variable bindings with a pointer to the parent envionment."))
 
 (defmethod search-bind ((obj env) key)
+  "Searches for a bind by name towards parent scopes. Sets error value if not found."
   (if (nth-value 1 (gethash key (bindings obj))) ; check the flag for key existance
     (gethash key (bindings obj))
     (if (parent obj)
@@ -126,6 +130,8 @@
   (setf (gethash sym (bindings obj)) val))
 
 (defparameter *global-env* (make-instance 'env))
+
+; NIL Symbol
 (setf (gethash "nil" (bindings *global-env*)) nil)
 
 ; Built-in Functions
@@ -136,6 +142,10 @@
 (setf (gethash "=" (bindings *global-env*)) (lambda (args) (apply #'= args)))
 
 ; Special Forms
+(defun s-form-progn (form env)
+  (car (last (mapcar (lambda (item) (lips-eval item env))
+                     form))))
+
 (defun s-form-if (form env)
   (if (lips-eval (car form) env)
     (lips-eval (cadr form) env)
@@ -147,20 +157,49 @@
       (add-bind env (car form) val)
       val)))
 
-(defun s-form-defmacro (sym codes param-names env)
-  (typecase codes
-    (quote-obj (add-bind env sym (make-macro-obj :codes codes)))
-    (back-quote-obj (add-bind env sym (make-macro-obj :params param-names :codes codes)))
-    (t (let ((val (lips-eval codes env)))
+(defun s-form-defmacro (form env)
+  "Macro can be defined by backquote, quote or direct expression."
+  (typecase (caddr form)
+    (quote-obj (add-bind env (car form) (make-macro-obj :codes (caddr form))))
+    (back-quote-obj (add-bind env (car form) (make-macro-obj :params (cadr form) :codes (caddr form))))
+    (t (let ((val (lips-eval (caddr form) env)))
          (unless *lips-error*
-           (add-bind env sym (make-macro-obj :params param-names :codes val)))))))
+           (add-bind env (car form) (make-macro-obj :params (cadr form) :codes val)))))))
 
 (defun s-form-macroexpand (form env)
   (let* ((quote-expr (quote-obj-expr (lips-eval (car form) env)))
          (bind (search-bind env (car quote-expr))))
     (expand-macro (macro-obj-codes bind) (macro-obj-params bind) (cdr quote-expr) env)))
 
+(defun call-func (func arg-forms env)
+  (funcall func (mapcar (lambda (param) (lips-eval param env))
+                        arg-forms)))
+ 
+(defun call-lambda (obj arg-value-forms env)
+  (lips-eval (lambda-obj-codes obj)
+             (create-lexical-env (lambda-obj-args obj) arg-value-forms env t)))
+
+(defun call-macro (obj arg-value-forms env)
+  (let ((codes (macro-obj-codes obj))
+        (param-names (macro-obj-params obj)))
+    (typecase codes
+      (back-quote-obj
+        (lips-eval (quote-obj-expr
+                     (expand-macro codes param-names arg-value-forms env))
+                   env))
+      (quote-obj (lips-eval (quote-obj-expr codes) env))
+      (t (lips-eval codes (create-lexical-env param-names arg-value-forms env t))))))
+
+(defun expand-macro (codes param-names arg-value-forms env)
+  (let ((new-env (create-lexical-env param-names arg-value-forms env nil)))
+    (typecase codes
+      (back-quote-obj (interpolate-back-quote codes new-env nil))
+      (quote-obj (quote-obj-expr codes))
+      (t codes))))
+
 (defun create-lexical-env (arg-names arg-value-forms env eval-val)
+  "Creates the bindings for function parameters lexically. Also used for
+the back quote interpolation of macro without evaluating the values."
   (let ((new-env (make-instance 'env :parent env)))
     (mapcar (lambda (k v)
               (add-bind new-env k 
@@ -170,27 +209,10 @@
             arg-names
             arg-value-forms)
     new-env))
- 
-(defun call-lambda (codes arg-names arg-value-forms env)
-  (lips-eval codes (create-lexical-env arg-names arg-value-forms env t)))
-
-(defun call-macro (codes param-names arg-value-forms env)
-  (typecase codes
-    (back-quote-obj
-      (lips-eval (quote-obj-expr
-                   (expand-macro codes param-names arg-value-forms env))
-                 env))
-    (quote-obj (lips-eval (quote-obj-expr codes) env))
-    (t (lips-eval codes (create-lexical-env param-names arg-value-forms env t)))))
-
-(defun expand-macro (codes param-names arg-value-forms env)
-  (let ((new-env (create-lexical-env param-names arg-value-forms env nil)))
-    (typecase codes
-      (back-quote-obj (interpolate-back-quote codes new-env nil))
-      (quote-obj (quote-obj-expr codes))
-      (t codes))))
 
 (defun interpolate-back-quote (obj env eval-comma)
+  "Interpolates the comma symbols with a given env. For macros this
+function is used without evaluating the comma symbols."
   (let ((expr (back-quote-obj-expr obj)))
     (make-quote-obj
       :expr (typecase expr
@@ -212,20 +234,18 @@
     (typecase form
       (list
         (let ((f-name (car form)))
-          (cond ((equal "progn" f-name)
-                 (car (last (mapcar (lambda (item) (lips-eval item env)) (cdr form)))))
+          (cond ((equal "progn" f-name) (s-form-progn (cdr form) env))
                 ((equal "if" f-name) (s-form-if (cdr form) env))
                 ((equal "define" f-name) (s-form-define (cdr form) env))
                 ((equal "lambda" f-name) (make-lambda-obj :args (cadr form) :codes (caddr form)))
-                ((equal "defmacro" f-name) (s-form-defmacro (cadr form) (cadddr form) (caddr form) env))
+                ((equal "defmacro" f-name) (s-form-defmacro (cdr form) env))
                 ((equal "macroexpand" f-name) (s-form-macroexpand (cdr form) env))
                 (t (let ((bind (search-bind env f-name)))
                      (typecase bind
                        (quote-obj bind)
-                       (function
-                         (funcall bind (mapcar (lambda (param) (lips-eval param env)) (cdr form))))
-                       (lambda-obj (call-lambda (lambda-obj-codes bind) (lambda-obj-args bind) (cdr form) env))
-                       (macro-obj (call-macro (macro-obj-codes bind) (macro-obj-params bind) (cdr form) env))
+                       (function (call-func bind (cdr form) env))
+                       (lambda-obj (call-lambda bind (cdr form) env))
+                       (macro-obj (call-macro bind (cdr form) env))
                        (t (setf *lips-error* "Illegal function call."))))))))
       (nil-obj nil)
       (quote-obj form)
