@@ -16,7 +16,10 @@
   (is (string= "1" (run-lips "1")))
   (is (string= "(1 2)" (run-lips " ' ( 1 2 ) ")))
   (is (string= "NIL" (run-lips "()")))
-  (is (string= "NIL" (run-lips "nil"))))
+  (is (string= "NIL" (run-lips "nil")))
+  (is (string= "Unclosed parenthesis." (run-lips "(1")))
+  (is (string= "Unclosed parenthesis." (run-lips "'(1")))
+  (is (string= "Unclosed parenthesis." (run-lips "`(1"))))
 
 (test lips-illegal-func-calls
   (is (string= "Illegal function call." (run-lips "(1)")))
@@ -31,7 +34,9 @@
   (is (string= "1" (run-lips "(/ 9 3 3)")))
   (is (string= "1.5" (run-lips "(/ 3 2)")))
   (is (string= "NIL" (run-lips "(= 1 1 3)")))
-  (is (string= "T" (run-lips "(= 1 1 1)"))))
+  (is (string= "T" (run-lips "(= 1 1 1)")))
+  (is (string= "Invalid arguments for numeric operation." (run-lips "(+ 1 a)")))
+  (is (string= "Invalid arguments for numeric operation." (run-lips "(+)"))))
 
 (test lips-quote
   (is (string= "a" (run-lips "'a")))
@@ -55,7 +60,7 @@
 (test lips-back-quote
   (is (string= "5" (run-lips "`5")))
   (is (string= "a" (run-lips "`a")))
-  (is (string= "(a b)" (run-lips "`'(a b))")))
+  (is (string= "(a b)" (run-lips "`'(a b)")))
   (is (string= "5" (run-lips "(progn (define n 5) `,n)"))))
 
 (test lips-macro
@@ -64,5 +69,6 @@
   (is (string= "(+ 3 6)" (run-lips "(progn (defmacro mac (n) `(+ 3 ,n)) (macroexpand '(mac 6)))")))
   (is (string= "(+ 1 (- 3 1))" (run-lips "(progn (defmacro mac (n) `(+ 1 ,n)) (macroexpand '(mac (- 3 1))))")))
   (is (string= "3" (run-lips "(progn (defmacro mac (n) `(+ 1 ,n)) (mac (- 3 1)))")))
-  )
+  (is (string= "1" (run-lips "(progn (defmacro unless (cond body) `(if ,cond () ,body)) (unless nil 1))")))
+  (is (string= "NIL" (run-lips "(progn (defmacro unless (cond body) `(if ,cond () ,body)) (unless 1 1))"))))
 

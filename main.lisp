@@ -21,9 +21,11 @@
   (finish-output)
   (let ((line (read-line *stream-in* nil :eof)))
     (unless (equal line "(lips:exit)")
-      (lips-print (lips-eval (lips-read (make-instance 'input-line :str line))))
-      (unless one-line-exec
-        (lips-repl)))))
+      (let ((line-obj (make-instance 'input-line :str line)))
+        (if (check-parenthesis line-obj)
+            (lips-print (lips-eval (lips-read line-obj)))
+            (write-line "Unclosed parenthesis." *stream-out*))
+        (unless one-line-exec (lips-repl))))))
 
 ;;; Parser
 
@@ -42,6 +44,9 @@
 (defmethod forward-head ((obj input-line))
   (setf (head obj) (1+ (head obj)))) 
 
+(defmethod reset-head ((obj input-line))
+   (setf (head obj) 0))
+
 (defmethod peek-ch ((obj input-line))
   (char (str obj) (head obj)))
 
@@ -49,6 +54,15 @@
   (let ((ch (peek-ch obj)))
     (forward-head obj)
     ch))
+
+(defmethod check-parenthesis ((obj input-line) &optional (open-count 0))
+   (if (has-more-str obj)
+       (case (read-ch obj)
+         (#\( (check-parenthesis obj (1+ open-count)))
+         (#\) (check-parenthesis obj (1- open-count)))
+         (t (check-parenthesis obj open-count)))
+       (progn (reset-head obj)
+              (= 0 open-count))))
  
 (defstruct nil-obj)
 (defstruct quote-obj expr)
@@ -134,12 +148,18 @@
 ; NIL Symbol
 (setf (gethash "nil" (bindings *global-env*)) nil)
 
+(defmacro num-check-apply (calc args)
+  `(if (and ,args (every #'numberp ,args))
+       (apply ,calc ,args)
+      (progn (setf *lips-error* "Invalid arguments for numeric operation.")
+             nil)))
+
 ; Built-in Functions
-(setf (gethash "+" (bindings *global-env*)) (lambda (args) (apply #'+ args)))
-(setf (gethash "-" (bindings *global-env*)) (lambda (args) (apply #'- args)))
-(setf (gethash "*" (bindings *global-env*)) (lambda (args) (apply #'* args)))
-(setf (gethash "/" (bindings *global-env*)) (lambda (args) (apply #'/ args)))
-(setf (gethash "=" (bindings *global-env*)) (lambda (args) (apply #'= args)))
+(setf (gethash "+" (bindings *global-env*)) (lambda (args) (num-check-apply #'+ args)))
+(setf (gethash "-" (bindings *global-env*)) (lambda (args) (num-check-apply #'- args)))
+(setf (gethash "*" (bindings *global-env*)) (lambda (args) (num-check-apply #'* args)))
+(setf (gethash "/" (bindings *global-env*)) (lambda (args) (num-check-apply #'/ args)))
+(setf (gethash "=" (bindings *global-env*)) (lambda (args) (num-check-apply #'= args)))
 
 ; Special Forms
 (defun s-form-progn (form env)
