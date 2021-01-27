@@ -71,7 +71,7 @@
             (t (read-symbol line))))))
 
 (defun check-nil (line)
-  "Checks for an empty list."
+  "Checks for an empty list. Should be called right after list opening is found."
   (if (equal #\) (peek-ch line))
     (progn (forward-head line)
            t)))
