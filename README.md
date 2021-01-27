@@ -2,16 +2,17 @@
 
 `Mini Lisp in 300 lines of Lisp` 
 
-This is a very minimal Lisp interpreter written in Lisp. I made it since I wanted to learn Lisp as well as how to set up a Lisp project with Roswell and a testing library. It's nowhere near a full-fledged Lisp, nor does it intend to be, yet I found it quite fun to code Lisp to make Lisp :)
+This is a very minimal Lisp interpreter written in Lisp. I made it because I wanted to learn Lisp and I was also interested in a Lisp project setup with tools like [Roswell](https://github.com/roswell/roswell) and [fiveam](https://common-lisp.net/project/fiveam/docs/index.html).
+
+It's nowhere near a full-fledged Lisp, nor does it intend to be, yet I found it to be a good exercise to make some Lisp in Lisp to get myself familiarized with a bit of Lisp.
 
 #### Supported Features
 
-* `nil`
-* integers
-* symbols with `define` (not ANSI CL)
+* `nil`, integers, symbols
+* `define` (not ANSI CL)
 * `if`
-* lambda
 * `+`, `-`, `/`, `*` and `=`
+* lambda
 * user-defined functions
 * lexically-scoped variables
 * progn
